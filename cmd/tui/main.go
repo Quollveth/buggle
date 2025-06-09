@@ -23,6 +23,13 @@ type station struct {
 	url  string
 }
 
+const NUM_TABS = 3
+const (
+	TAB_STATIONS int = iota
+	TAB_SONGS
+	TAB_PLACEHOLDER
+)
+
 type model struct {
 	connected bool // are we connected to the daemon
 	quitting  bool // showing "are ya sure to quit" screen
@@ -38,9 +45,9 @@ type model struct {
 	}
 
 	//-- UI data
-	tabs      []string
 	activeTab int
-	tabView   []func(model) string
+	tabs      [NUM_TABS]string
+	tabView   [NUM_TABS]func(model) string
 
 	paginator paginator.Model
 }
@@ -107,6 +114,12 @@ func createFakeData() model {
 	p.InactiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).Render("•")
 	p.SetTotalPages(len(songs))
 
+	tabViews := [NUM_TABS]func(model) string{}
+
+	tabViews[TAB_STATIONS] = stationsTabView
+	tabViews[TAB_SONGS] = songTabView
+	tabViews[TAB_PLACEHOLDER] = placeholderView
+
 	return model{
 		connected: true,
 		quitting:  false,
@@ -126,9 +139,9 @@ func createFakeData() model {
 		},
 
 		paginator: p,
-		tabs:      []string{"Stations", "Songs", "Placeholder"},
+		tabs:      [NUM_TABS]string{"Stations", "Songs", "Placeholder"},
+		tabView:   tabViews,
 		activeTab: 0,
-		tabView:   []func(model) string{stationsTabView, songTabView, placeholderView},
 	}
 }
 
@@ -158,9 +171,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // styles
 func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 	border := lipgloss.RoundedBorder()
-	border.BottomLeft = left
-	border.Bottom = middle
-	border.BottomRight = right
+	border.TopLeft = left
+	border.Top = middle
+	border.TopRight = right
 	return border
 }
 
@@ -171,12 +184,12 @@ var (
 	width, height, _ = term.GetSize(os.Stdin.Fd())
 	outStyle         = lipgloss.NewStyle().Width(width - 2).Height(height - 2).Border(lipgloss.NormalBorder()).BorderForeground(outBorderColor)
 
-	inactiveTabBorder = tabBorderWithBottom("┴", "─", "┴")
-	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
+	inactiveTabBorder = tabBorderWithBottom("┬", "─", "┬")
+	activeTabBorder   = tabBorderWithBottom("┐", " ", "┌")
 	inactiveTabStyle  = lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
 	activeTabStyle    = inactiveTabStyle.Border(activeTabBorder, true)
 
-	windowStyle = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderTop()
+	windowStyle = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderBottom()
 )
 
 func placeholderView(m model) string { return "nothing here" }
@@ -221,15 +234,15 @@ func (m model) View() string {
 
 		if isActive {
 			if isFirst {
-				border.BottomLeft = "│"
+				border.TopLeft= "│"
 			} else if isLast {
-				border.BottomRight = "│"
+				border.TopRight= "│"
 			}
 		} else {
 			if isFirst {
-				border.BottomLeft = "├"
+				border.TopLeft= "├"
 			} else if isLast {
-				border.BottomRight = "┤"
+				border.TopRight= "┤"
 			}
 		}
 
@@ -239,9 +252,9 @@ func (m model) View() string {
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
-	doc.WriteString(row)
-	doc.WriteString("\n")
 	doc.WriteString(windowStyle.Width((lipgloss.Width(row) - windowStyle.GetHorizontalFrameSize())).Render(m.tabView[m.activeTab](m)))
+	doc.WriteString("\n")
+	doc.WriteString(row)
 	return outStyle.Render(doc.String())
 }
 
