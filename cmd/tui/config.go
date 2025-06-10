@@ -9,7 +9,9 @@ import (
 
 type colors struct {
 	outBorder,
-	hightlight lipgloss.Color
+	hightlight,
+	listActiveDot,
+	listInactiveDot lipgloss.Color
 }
 
 type config struct {
@@ -19,8 +21,10 @@ type config struct {
 func createDefaultConfig() config {
 	return config{
 		colors: colors{
-			outBorder:  lipgloss.Color("#FFFF00"),
-			hightlight: lipgloss.Color("#00FFFF"),
+			outBorder:       lipgloss.Color("#FFFF00"),
+			hightlight:      lipgloss.Color("#00FFFF"),
+			listActiveDot:   lipgloss.Color("252"),
+			listInactiveDot: lipgloss.Color("238"),
 		},
 	}
 }

@@ -106,11 +106,13 @@ func initModel(config config) model {
 		},
 	}
 
+	styles := createStyles(config.colors)
+
 	p := paginator.New()
 	p.Type = paginator.Dots
 	p.PerPage = 2
-	p.ActiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "235", Dark: "252"}).Render("•")
-	p.InactiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).Render("•")
+	p.ActiveDot = lipgloss.NewStyle().Foreground(config.colors.listActiveDot).Render("•")
+	p.InactiveDot = lipgloss.NewStyle().Foreground(config.colors.listInactiveDot).Render("•")
 	p.SetTotalPages(len(songs))
 
 	tabViews := [NUM_TABS]func(model) string{}
@@ -136,11 +138,8 @@ func initModel(config config) model {
 			song:    songs[0],
 			station: stations[0],
 		},
-
-		styles: createStyles(config.colors),
-
+		styles:    styles,
 		paginator: p,
-		//tabs:      [NUM_TABS]string{"Stations", "Songs", "Placeholder"},
 		tabs:      [NUM_TABS]string{"tab 1", "tab 2", "tab 3"},
 		tabView:   tabViews,
 		activeTab: 0,
@@ -178,9 +177,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-
+//
 //-- Renders
-
+//
 
 func placeholderView(m model) string { return "nothing here" }
 
@@ -237,14 +236,40 @@ func (m model) renderTabs() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 }
 
+func (m model) renderPlaying() string {
+	return "now playing goes here"
+}
+
+//
+//-- Main Render
+//
+
 func (m model) View() string {
 	allTabs := m.renderTabs()
 
-	borderFinish := lipgloss.NewStyle().Foreground(m.styles.outerWindow.GetForeground()).Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
+	//borderFinish := lipgloss.NewStyle().Foreground(m.styles.outerWindow.GetBorderBottomForeground()).Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
+	borderFinish := lipgloss.NewStyle().Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
 
-	row := lipgloss.JoinHorizontal(lipgloss.Top, allTabs, borderFinish)
+	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, allTabs, borderFinish)
 
-	return m.styles.outerWindow.Render(row)
+	//-- build
+
+	var b strings.Builder
+
+	playing := m.renderPlaying()
+
+	b.WriteString(lipgloss.JoinVertical(
+		lipgloss.Left,
+		tabsRow,
+
+		lipgloss.NewStyle().Height(
+			m.styles.outerWindow.GetHeight() - (lipgloss.Height(tabsRow) + lipgloss.Height(playing)),
+		).Render(m.tabView[m.activeTab](m)),
+
+		playing,
+	))
+
+	return m.styles.outerWindow.Render(b.String())
 }
 
 func main() {
