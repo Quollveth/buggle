@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
 
 	"github.com/charmbracelet/bubbles/paginator"
 )
@@ -44,6 +43,9 @@ type model struct {
 		station station
 	}
 
+	//-- Config
+	styles styles
+
 	//-- UI data
 	activeTab int
 	tabs      [NUM_TABS]string
@@ -52,10 +54,7 @@ type model struct {
 	paginator paginator.Model
 }
 
-// let everything initialize to zero value
-func initModel() model { return model{} }
-
-func createFakeData() model {
+func initModel(config config) model {
 	songs := []song{
 		{
 			name:   "Song 1",
@@ -138,8 +137,11 @@ func createFakeData() model {
 			station: stations[0],
 		},
 
+		styles: createStyles(config.colors),
+
 		paginator: p,
-		tabs:      [NUM_TABS]string{"Stations", "Songs", "Placeholder"},
+		//tabs:      [NUM_TABS]string{"Stations", "Songs", "Placeholder"},
+		tabs:      [NUM_TABS]string{"tab 1", "tab 2", "tab 3"},
 		tabView:   tabViews,
 		activeTab: 0,
 	}
@@ -159,38 +161,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "h":
 			m.paginator.PrevPage()
 		case "tab":
-			m.activeTab = min(m.activeTab+1, len(m.tabs)-1)
+			if m.activeTab == len(m.tabs)-1 {
+				m.activeTab = 0
+			} else {
+				m.activeTab++
+			}
 		case "shift+tab":
-			m.activeTab = max(m.activeTab-1, 0)
+			if m.activeTab == 0 {
+				m.activeTab = len(m.tabs) - 1
+			} else {
+				m.activeTab--
+			}
 		}
 	}
 
 	return m, nil
 }
 
-// styles
-func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
-	border := lipgloss.RoundedBorder()
-	border.TopLeft = left
-	border.Top = middle
-	border.TopRight = right
-	return border
-}
 
-var (
-	outBorderColor = lipgloss.Color("#00FFFF")
-	highlightColor = lipgloss.Color("#FF0000")
+//-- Renders
 
-	width, height, _ = term.GetSize(os.Stdin.Fd())
-	outStyle         = lipgloss.NewStyle().Width(width - 2).Height(height - 2).Border(lipgloss.NormalBorder()).BorderForeground(outBorderColor)
-
-	inactiveTabBorder = tabBorderWithBottom("┬", "─", "┬")
-	activeTabBorder   = tabBorderWithBottom("┐", " ", "┌")
-	inactiveTabStyle  = lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
-	activeTabStyle    = inactiveTabStyle.Border(activeTabBorder, true)
-
-	windowStyle = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderBottom()
-)
 
 func placeholderView(m model) string { return "nothing here" }
 
@@ -216,67 +206,52 @@ func songTabView(m model) string {
 	return b.String()
 }
 
-func (m model) View() string {
-	doc := strings.Builder{}
-
+func (m model) renderTabs() string {
 	var renderedTabs []string
 
 	for i, t := range m.tabs {
 		var style lipgloss.Style
 		isFirst, isLast, isActive := i == 0, i == len(m.tabs)-1, i == m.activeTab
 		if isActive {
-			style = activeTabStyle
+			style = m.styles.activeTab
 		} else {
-			style = inactiveTabStyle
+			style = m.styles.inactiveTab
 		}
 
 		border, _, _, _, _ := style.GetBorder()
 
-		if isActive {
-			if isFirst {
-				border.TopLeft= "│"
-			} else if isLast {
-				border.TopRight= "│"
-			}
-		} else {
-			if isFirst {
-				border.TopLeft= "├"
-			} else if isLast {
-				border.TopRight= "┤"
-			}
+		if isActive && isFirst {
+			border.TopLeft = "┐"
+		} else if isActive && isLast {
+			border.TopRight = "┬"
+		} else if !isActive && isFirst {
+			border.TopLeft = "┬"
+		} else if !isActive && isLast {
+			border.TopRight = "┬"
 		}
 
 		style = style.Border(border)
 		renderedTabs = append(renderedTabs, style.Render(t))
-
 	}
 
-	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
-	doc.WriteString(windowStyle.Width((lipgloss.Width(row) - windowStyle.GetHorizontalFrameSize())).Render(m.tabView[m.activeTab](m)))
-	doc.WriteString("\n")
-	doc.WriteString(row)
-	return outStyle.Render(doc.String())
+	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
+}
+
+func (m model) View() string {
+	allTabs := m.renderTabs()
+
+	borderFinish := lipgloss.NewStyle().Foreground(m.styles.outerWindow.GetForeground()).Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
+
+	row := lipgloss.JoinHorizontal(lipgloss.Top, allTabs, borderFinish)
+
+	return m.styles.outerWindow.Render(row)
 }
 
 func main() {
-	p := tea.NewProgram(createFakeData())
+	p := tea.NewProgram(initModel(createDefaultConfig()))
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("peepee went poopoo: %v", err)
 		os.Exit(1)
 	}
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
