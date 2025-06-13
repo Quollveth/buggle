@@ -1,10 +1,7 @@
 package main
 
 import (
-	"os"
-
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
 )
 
 type colors struct {
@@ -20,9 +17,10 @@ type config struct {
 
 func createDefaultConfig() config {
 	return config{
+
 		colors: colors{
-			outBorder:       lipgloss.Color("#FFFF00"),
-			hightlight:      lipgloss.Color("#00FFFF"),
+			outBorder:       lipgloss.Color("#00FFFF"),
+			hightlight:      lipgloss.Color("#FFFF00"),
 			listActiveDot:   lipgloss.Color("252"),
 			listInactiveDot: lipgloss.Color("238"),
 		},
@@ -30,33 +28,31 @@ func createDefaultConfig() config {
 }
 
 type styles struct {
-	outerWindow,
-	inactiveTab,
-	activeTab lipgloss.Style
+	middleWindow, bottomWindow,
+	inactiveTab, activeTab lipgloss.Style
 }
 
-func borderWithTop(left, middle, right string) lipgloss.Border {
+func borderWithBottom(left, middle, right string) lipgloss.Border {
 	border := lipgloss.RoundedBorder()
-	border.TopLeft = left
-	border.Top = middle
-	border.TopRight = right
+	border.BottomLeft = left
+	border.Bottom = middle
+	border.BottomRight = right
 	return border
 }
 
-func createStyles(colors colors) styles {
-	winWidth, winHeight, _ := term.GetSize(os.Stdin.Fd())
+func createStyles(colors colors, width, height int) styles {
+	inactiveTabBorder := borderWithBottom("┴", "─", "┴")
+	activeTabBorder := borderWithBottom("┘", " ", "└")
+	inactiveTab := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(colors.outBorder).Padding(0, 1)
+	activeTab := inactiveTab.Border(activeTabBorder, true)
 
-	outBorder := borderWithTop("┌", " ", "┐")
-	outStyle := lipgloss.NewStyle().Width(winWidth-2).Height(winHeight-2).Border(outBorder, true).BorderForeground(colors.outBorder).UnsetBorderTop()
-
-	inactiveTabBorder := borderWithTop("┬", "─", "┬")
-	activeTabBorder := borderWithTop("┐", " ", "┌")
-	inactiveTabStyle := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(colors.hightlight).Padding(0, 1)
-	activeTabStyle := inactiveTabStyle.Border(activeTabBorder, true)
+	bottomWindow := lipgloss.NewStyle().Width(width).Border(lipgloss.RoundedBorder()).BorderForeground(colors.outBorder).UnsetBorderTop()
+	middleWindow := bottomWindow.UnsetBorderBottom()
 
 	return styles{
-		outerWindow: outStyle,
-		inactiveTab: inactiveTabStyle,
-		activeTab:   activeTabStyle,
+		inactiveTab:  inactiveTab,
+		activeTab:    activeTab,
+		middleWindow: middleWindow,
+		bottomWindow: bottomWindow,
 	}
 }

@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/charmbracelet/bubbles/paginator"
 )
@@ -31,7 +32,6 @@ const (
 
 type model struct {
 	connected bool // are we connected to the daemon
-	quitting  bool // showing "are ya sure to quit" screen
 
 	saved struct {
 		songs    []song
@@ -47,6 +47,8 @@ type model struct {
 	styles styles
 
 	//-- UI data
+	winHeight, winWidth int
+
 	activeTab int
 	tabs      [NUM_TABS]string
 	tabView   [NUM_TABS]func(model) string
@@ -55,6 +57,11 @@ type model struct {
 }
 
 func initModel(config config) model {
+	winWidth, winHeight, _ := term.GetSize(os.Stdin.Fd())
+
+	winWidth -= 2
+	winHeight -= 2
+
 	songs := []song{
 		{
 			name:   "Song 1",
@@ -106,7 +113,7 @@ func initModel(config config) model {
 		},
 	}
 
-	styles := createStyles(config.colors)
+	styles := createStyles(config.colors, winWidth, winHeight)
 
 	p := paginator.New()
 	p.Type = paginator.Dots
@@ -123,7 +130,6 @@ func initModel(config config) model {
 
 	return model{
 		connected: true,
-		quitting:  false,
 		saved: struct {
 			songs    []song
 			stations []station
@@ -138,6 +144,9 @@ func initModel(config config) model {
 			song:    songs[0],
 			station: stations[0],
 		},
+		winWidth:  winWidth,
+		winHeight: winHeight,
+
 		styles:    styles,
 		paginator: p,
 		tabs:      [NUM_TABS]string{"tab 1", "tab 2", "tab 3"},
@@ -210,8 +219,9 @@ func (m model) renderTabs() string {
 
 	for i, t := range m.tabs {
 		var style lipgloss.Style
-		isFirst, isLast, isActive := i == 0, i == len(m.tabs)-1, i == m.activeTab
-		if isActive {
+		active := i == m.activeTab
+
+		if active {
 			style = m.styles.activeTab
 		} else {
 			style = m.styles.inactiveTab
@@ -219,14 +229,12 @@ func (m model) renderTabs() string {
 
 		border, _, _, _, _ := style.GetBorder()
 
-		if isActive && isFirst {
-			border.TopLeft = "┐"
-		} else if isActive && isLast {
-			border.TopRight = "┬"
-		} else if !isActive && isFirst {
-			border.TopLeft = "┬"
-		} else if !isActive && isLast {
-			border.TopRight = "┬"
+		if i == 0 {
+			if active {
+				border.BottomLeft = "│"
+			} else {
+				border.BottomLeft = "├"
+			}
 		}
 
 		style = style.Border(border)
@@ -247,10 +255,13 @@ func (m model) renderPlaying() string {
 func (m model) View() string {
 	allTabs := m.renderTabs()
 
-	//borderFinish := lipgloss.NewStyle().Foreground(m.styles.outerWindow.GetBorderBottomForeground()).Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
-	borderFinish := lipgloss.NewStyle().Render(strings.Repeat("─", m.styles.outerWindow.GetWidth()-lipgloss.Width(allTabs)))
+	borderLength := m.winWidth - lipgloss.Width(allTabs) + 1
+	borderLine := strings.Repeat("─", borderLength)
+	borderLine = "\n\n" + borderLine + "╮"
 
-	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, allTabs, borderFinish)
+	styledBorder := lipgloss.NewStyle().Foreground(m.styles.activeTab.GetBorderTopForeground()).Render(borderLine)
+
+	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, allTabs, styledBorder)
 
 	//-- build
 
@@ -262,14 +273,14 @@ func (m model) View() string {
 		lipgloss.Left,
 		tabsRow,
 
-		lipgloss.NewStyle().Height(
-			m.styles.outerWindow.GetHeight() - (lipgloss.Height(tabsRow) + lipgloss.Height(playing)),
+		m.styles.middleWindow.Height(
+			m.winHeight-(lipgloss.Height(tabsRow)+lipgloss.Height(playing)),
 		).Render(m.tabView[m.activeTab](m)),
 
-		playing,
+		m.styles.bottomWindow.Render(playing),
 	))
 
-	return m.styles.outerWindow.Render(b.String())
+	return b.String()
 }
 
 func main() {
