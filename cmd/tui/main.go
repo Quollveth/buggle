@@ -155,8 +155,8 @@ func (m *model) updateSizes() {
 	middleWindowHeight := m.winHeight - (lipgloss.Height(tabsRow) + lipgloss.Height(playing))
 
 	m.styles.middleWindow = m.styles.middleWindow.Height(middleWindowHeight)
-	m.styles.leftPane.Height(middleWindowHeight)
-	m.styles.rightPane.Height(middleWindowHeight)
+	m.styles.leftPane     = m.styles.leftPane.Height(middleWindowHeight)
+	m.styles.rightPane    = m.styles.rightPane.Height(middleWindowHeight)
 
 	m.updatePaginator()
 }
@@ -309,13 +309,9 @@ func (m model) renderTabs() string {
 
 func (m model) renderPlaying() string {
 	str := fmt.Sprintf(
-		"Window width: %v | middle window width: %v | left pane width: %v | right pane width: %v | total: %v",
-		m.winWidth,
-		m.styles.middleWindow.GetWidth(),
-		m.styles.leftPane.GetWidth(),
-		m.styles.rightPane.GetWidth(),
-
-		m.styles.leftPane.GetWidth()+m.styles.rightPane.GetWidth(),
+		"left pane height: %v | rendered left pane height: %v",
+		m.styles.leftPane.GetHeight(),
+		lipgloss.Height(m.styles.leftPane.Render(m.tabView[m.activeTab](m))),
 	)
 
 	return m.styles.bottomWindow.Render(str)
@@ -334,7 +330,7 @@ func (m model) renderTabLine() string {
 	}
 
 	borderLine := strings.Repeat("─", borderLength)
-	borderLine = "\n\n" + borderLine + "┬"
+	borderLine = "\n\n" + borderLine + "┬─"
 	borderLine += strings.Repeat("─", m.styles.rightPane.GetWidth()) + "╮"
 
 	styledBorder := lipgloss.NewStyle().Foreground(m.styles.activeTab.GetBorderTopForeground()).Render(borderLine)

@@ -57,7 +57,13 @@ func createStyles(colors colors, width, height int) styles {
 	textPrimary := lipgloss.NewStyle().Foreground(colors.textPrimary)
 	textSecondary := lipgloss.NewStyle().Foreground(colors.textSecondary)
 
-	rightPane := lipgloss.NewStyle().Width((width/2)-2).Border(borderWithBottom("┴", "─", "┤")).BorderForeground(colors.outBorder).UnsetBorderTop().UnsetBorderLeft()
+
+	rightPaneBorder := lipgloss.RoundedBorder()
+	rightPaneBorder.BottomRight = "┤"
+	rightPaneBorder.BottomLeft = "─"
+	rightPaneBorder.Left = " "
+
+	rightPane := lipgloss.NewStyle().Width((width/2)-2).BorderForeground(colors.outBorder).Border(rightPaneBorder).UnsetBorderTop()
 	leftPane  := rightPane.Border(borderWithBottom("├", "─", "┴")).UnsetBorderTop()
 
 	return styles{
