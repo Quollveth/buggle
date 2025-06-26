@@ -63,7 +63,7 @@ type model struct {
 func initModel(config config) model {
 	winWidth, winHeight, _ := term.GetSize(os.Stdin.Fd())
 
-	winWidth -= 2
+	winHeight -= 2
 	winHeight -= 2
 
 	songs := []song{}
@@ -151,7 +151,7 @@ func (m *model) updatePaginator() {
 
 func (m *model) updateSizes() {
 	tabsRow := m.renderTabLine()
-	playing := m.renderPlaying()
+	playing := m.renderBottomWindow()
 	middleWindowHeight := m.winHeight - (lipgloss.Height(tabsRow) + lipgloss.Height(playing))
 
 	m.styles.middleWindow = m.styles.middleWindow.Height(middleWindowHeight)
@@ -307,17 +307,20 @@ func (m model) renderTabs() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 }
 
-func (m model) renderPlaying() string {
-	lw := lipgloss.Width(m.styles.leftPane.Render(m.tabView[m.activeTab](m)))
-	rw := lipgloss.Width(m.styles.rightPane.Render("info text here"))
-
+func (m model) renderBottomWindow() string {
+	/*
 	str := fmt.Sprintf(
-		"left pane width: %v | right pane width: %v | total: %v | middle window width: %v",
-		lw, rw, lw+rw,
+		"terminal width: %v | middle window width: %v | expected bottom window width: %v | real bottom window width: %v",
+		m.winWidth,
 		lipgloss.Width(m.renderMiddleWindow()),
+		m.styles.bottomWindow.GetWidth(),
+		lipgloss.Width(m.styles.bottomWindow.Render("")),
 	)
 
-	return m.styles.bottomWindow.Render(str)
+	rendered := m.styles.bottomWindow.Render(str)
+	*/
+
+	return m.styles.bottomWindow.Render("")
 }
 
 //
@@ -357,7 +360,7 @@ func (m model) View() string {
 		lipgloss.Top,
 		tabsRow,
 		m.renderMiddleWindow(),
-		m.renderPlaying(),
+		m.renderBottomWindow(),
 	))
 
 	return b.String()
