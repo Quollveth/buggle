@@ -51,7 +51,6 @@ type model struct {
 
 	//-- UI data
 	winHeight, winWidth int
-	middleWinHeight     int
 
 	activeTab    int
 	tabs         [NUM_TABS]string
@@ -92,9 +91,9 @@ func initModel(config config) model {
 	p.Type = paginator.Dots
 	p.ActiveDot = lipgloss.NewStyle().Foreground(config.colors.listActiveDot).Render("•")
 	p.InactiveDot = lipgloss.NewStyle().Foreground(config.colors.listInactiveDot).Render("•")
-
-	p.PerPage = 3
-	p.SetTotalPages(0)
+	// defaults to 1 to avoid division by zero panic, will be set to proper value before first render
+	p.PerPage = 1
+	p.SetTotalPages(1)
 
 	tabViews := [NUM_TABS]func(model) string{}
 
@@ -118,22 +117,22 @@ func initModel(config config) model {
 			song:    songs[0],
 			station: stations[0],
 		},
-		winWidth:        winWidth,
-		winHeight:       winHeight,
-		middleWinHeight: 0,
+		winWidth:  winWidth,
+		winHeight: winHeight,
 
 		styles:    styles,
 		paginator: p,
 		tabs:      [NUM_TABS]string{"Stations", "Songs", "Placeholder"},
 		tabView:   tabViews,
-		activeTab: 1,
+		activeTab: 2,
 	}
 }
 
 func (m model) Init() tea.Cmd { return nil }
 
-var SONG_HEIGHT int = lipgloss.Height(renderSong(song{}, false, styles{})) - 1
-var STATION_HEIGHT int = lipgloss.Height(renderStation(station{}, false, styles{})) - 1
+// these are technically constants but i can't actually make them const
+var SONG_HEIGHT int = lipgloss.Height(renderSongItem(song{}, false, styles{})) - 1
+var STATION_HEIGHT int = lipgloss.Height(renderStationItem(station{}, false, styles{})) - 1
 
 func (m *model) updatePaginator() {
 	m.paginator.Page = 0
@@ -141,14 +140,25 @@ func (m *model) updatePaginator() {
 
 	switch m.activeTab {
 	case TAB_SONGS:
-		// leave one line for the paginator dots ↓
-		m.paginator.PerPage = (m.middleWinHeight - 1) / SONG_HEIGHT
+		// add one extra line for the paginator dots             ↓
+		m.paginator.PerPage = (m.styles.middleWindow.GetHeight() - 1) / SONG_HEIGHT
 		m.paginator.SetTotalPages(len(m.saved.songs))
 	case TAB_STATIONS:
-		// leave one line for the paginator dots ↓
-		m.paginator.PerPage = (m.middleWinHeight - 1) / STATION_HEIGHT
+		m.paginator.PerPage = (m.styles.middleWindow.GetHeight() - 1) / STATION_HEIGHT
 		m.paginator.SetTotalPages(len(m.saved.stations))
 	}
+}
+
+func (m *model) updateSizes() {
+	tabsRow := m.renderTabLine()
+	playing := m.renderPlaying()
+	middleWindowHeight := m.winHeight - (lipgloss.Height(tabsRow) + lipgloss.Height(playing))
+
+	m.styles.middleWindow = m.styles.middleWindow.Height(middleWindowHeight)
+	m.styles.leftPane.Height(middleWindowHeight)
+	m.styles.rightPane.Height(middleWindowHeight)
+
+	m.updatePaginator()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -202,7 +212,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 //-- Renders
 //
 
-func renderSong(song song, selected bool, styles styles) string {
+func renderSongItem(song song, selected bool, styles styles) string {
 	var b strings.Builder
 
 	var bullet string
@@ -221,7 +231,7 @@ func renderSong(song song, selected bool, styles styles) string {
 	return b.String()
 }
 
-func renderStation(station station, selected bool, styles styles) string {
+func renderStationItem(station station, selected bool, styles styles) string {
 	var b strings.Builder
 
 	var bullet string
@@ -239,13 +249,15 @@ func renderStation(station station, selected bool, styles styles) string {
 	return b.String()
 }
 
+//
+
 func placeholderView(m model) string { return "nothing here" }
 
 func stationsTabView(m model) string {
 	var b strings.Builder
 	start, end := m.paginator.GetSliceBounds(len(m.saved.stations))
 	for idx, item := range m.saved.stations[start:end] {
-		b.WriteString(renderStation(item, m.selectedItem == idx, m.styles))
+		b.WriteString(renderStationItem(item, m.selectedItem == idx, m.styles))
 	}
 	b.WriteString("  " + m.paginator.View())
 
@@ -256,12 +268,14 @@ func songTabView(m model) string {
 	var b strings.Builder
 	start, end := m.paginator.GetSliceBounds(len(m.saved.songs))
 	for idx, item := range m.saved.songs[start:end] {
-		b.WriteString(renderSong(item, m.selectedItem == idx, m.styles))
+		b.WriteString(renderSongItem(item, m.selectedItem == idx, m.styles))
 	}
-	b.WriteString("  " + m.paginator.View())
+	b.WriteString(m.paginator.View())
 
 	return b.String()
 }
+
+//
 
 func (m model) renderTabs() string {
 	var renderedTabs []string
@@ -294,14 +308,17 @@ func (m model) renderTabs() string {
 }
 
 func (m model) renderPlaying() string {
-	var ih int
-	if m.activeTab == TAB_SONGS {
-		ih = SONG_HEIGHT
-	} else {
-		ih = STATION_HEIGHT
-	}
+	str := fmt.Sprintf(
+		"Window width: %v | middle window width: %v | left pane width: %v | right pane width: %v | total: %v",
+		m.winWidth,
+		m.styles.middleWindow.GetWidth(),
+		m.styles.leftPane.GetWidth(),
+		m.styles.rightPane.GetWidth(),
 
-	return fmt.Sprintf("middle window height: %v | item height: %v | items per page: %v", m.middleWinHeight, ih, (m.middleWinHeight-1)/ih)
+		m.styles.leftPane.GetWidth()+m.styles.rightPane.GetWidth(),
+	)
+
+	return m.styles.bottomWindow.Render(str)
 }
 
 //
@@ -311,44 +328,58 @@ func (m model) renderPlaying() string {
 func (m model) renderTabLine() string {
 	allTabs := m.renderTabs()
 
-	borderLength := m.winWidth - lipgloss.Width(allTabs) + 1
+	borderLength := m.styles.leftPane.GetWidth() - lipgloss.Width(allTabs) + 1
+	if borderLength < 0 {
+		return ""
+	}
+
 	borderLine := strings.Repeat("─", borderLength)
-	borderLine = "\n\n" + borderLine + "╮"
+	borderLine = "\n\n" + borderLine + "┬"
+	borderLine += strings.Repeat("─", m.styles.rightPane.GetWidth()) + "╮"
 
 	styledBorder := lipgloss.NewStyle().Foreground(m.styles.activeTab.GetBorderTopForeground()).Render(borderLine)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, allTabs, styledBorder)
+	return lipgloss.JoinHorizontal(lipgloss.Left, allTabs, styledBorder)
+}
+
+func (m model) renderMiddleWindow() string {
+	tab := m.styles.leftPane.Render(m.tabView[m.activeTab](m))
+	info := m.styles.rightPane.Render("info text here")
+
+	return m.styles.middleWindow.Render(lipgloss.JoinHorizontal(lipgloss.Left, tab, info))
 }
 
 func (m model) View() string {
 	tabsRow := m.renderTabLine()
-	playing := m.renderPlaying()
 
 	var b strings.Builder
 
 	b.WriteString(lipgloss.JoinVertical(
-		lipgloss.Left,
+		lipgloss.Top,
 		tabsRow,
-
-		m.styles.middleWindow.Height(m.middleWinHeight).Render(m.tabView[m.activeTab](m)),
-		m.styles.bottomWindow.Render(playing),
+		m.renderMiddleWindow(),
+		m.renderPlaying(),
 	))
 
 	return b.String()
 }
 
 func main() {
-	model := initModel(createDefaultConfig())
+	// these are constants and are only here so i don't have to count, they should never be zero
+	if SONG_HEIGHT == 0 {
+		panic("\x1b[1;91mSong renderer size is zero\x1b[1;0m\n")
+	}
+	if STATION_HEIGHT == 0 {
+		panic("\x1b[1;91mStation renderer size is zero\x1b[1;0m\n")
+	}
 
-	tabsRow := model.renderTabLine()
-	playing := model.renderPlaying()
-	model.middleWinHeight = model.winHeight - (lipgloss.Height(tabsRow) + lipgloss.Height(playing))
-	model.updatePaginator()
+	model := initModel(createDefaultConfig())
+	model.updateSizes()
 
 	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("peepee went poopoo: %v", err)
+		fmt.Printf("\x1b[1;91mpeepee went poopoo:\x1b[1;0m %v", err)
 		os.Exit(1)
 	}
 }

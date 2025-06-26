@@ -32,6 +32,7 @@ func createDefaultConfig() config {
 
 type styles struct {
 	middleWindow, bottomWindow,
+	leftPane, rightPane,
 	textPrimary, textSecondary,
 	inactiveTab, activeTab lipgloss.Style
 }
@@ -50,11 +51,14 @@ func createStyles(colors colors, width, height int) styles {
 	inactiveTab := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(colors.outBorder).Padding(0, 1)
 	activeTab := inactiveTab.Border(activeTabBorder, true)
 
-	middleWindow := lipgloss.NewStyle().Width(width).Border(borderWithBottom("├", "─", "┤")).BorderForeground(colors.outBorder).UnsetBorderTop()
-	bottomWindow := lipgloss.NewStyle().Width(width).Border(lipgloss.RoundedBorder()).BorderForeground(colors.outBorder).UnsetBorderTop()
+	middleWindow := lipgloss.NewStyle().Width(width)
+	bottomWindow := middleWindow.Border(lipgloss.RoundedBorder()).BorderForeground(colors.outBorder).UnsetBorderTop()
 
 	textPrimary := lipgloss.NewStyle().Foreground(colors.textPrimary)
 	textSecondary := lipgloss.NewStyle().Foreground(colors.textSecondary)
+
+	rightPane := lipgloss.NewStyle().Width((width/2)-2).Border(borderWithBottom("┴", "─", "┤")).BorderForeground(colors.outBorder).UnsetBorderTop().UnsetBorderLeft()
+	leftPane  := rightPane.Border(borderWithBottom("├", "─", "┴")).UnsetBorderTop()
 
 	return styles{
 		inactiveTab:   inactiveTab,
@@ -63,5 +67,7 @@ func createStyles(colors colors, width, height int) styles {
 		bottomWindow:  bottomWindow,
 		textPrimary:   textPrimary,
 		textSecondary: textSecondary,
+		leftPane: leftPane,
+		rightPane: rightPane,
 	}
 }
