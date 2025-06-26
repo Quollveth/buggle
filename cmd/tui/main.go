@@ -155,8 +155,8 @@ func (m *model) updateSizes() {
 	middleWindowHeight := m.winHeight - (lipgloss.Height(tabsRow) + lipgloss.Height(playing))
 
 	m.styles.middleWindow = m.styles.middleWindow.Height(middleWindowHeight)
-	m.styles.leftPane     = m.styles.leftPane.Height(middleWindowHeight)
-	m.styles.rightPane    = m.styles.rightPane.Height(middleWindowHeight)
+	m.styles.leftPane = m.styles.leftPane.Height(middleWindowHeight)
+	m.styles.rightPane = m.styles.rightPane.Height(middleWindowHeight)
 
 	m.updatePaginator()
 }
@@ -308,10 +308,13 @@ func (m model) renderTabs() string {
 }
 
 func (m model) renderPlaying() string {
+	lw := lipgloss.Width(m.styles.leftPane.Render(m.tabView[m.activeTab](m)))
+	rw := lipgloss.Width(m.styles.rightPane.Render("info text here"))
+
 	str := fmt.Sprintf(
-		"left pane height: %v | rendered left pane height: %v",
-		m.styles.leftPane.GetHeight(),
-		lipgloss.Height(m.styles.leftPane.Render(m.tabView[m.activeTab](m))),
+		"left pane width: %v | right pane width: %v | total: %v | middle window width: %v",
+		lw, rw, lw+rw,
+		lipgloss.Width(m.renderMiddleWindow()),
 	)
 
 	return m.styles.bottomWindow.Render(str)
